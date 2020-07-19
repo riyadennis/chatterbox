@@ -3,10 +3,7 @@ package internal
 import (
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v2"
-	"github.com/riyadennis/chatterbox/broadcast/signal"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"time"
 )
 
@@ -14,13 +11,9 @@ const (
 	RtcpPLIInterval = time.Second * 3
 )
 
-func OfferFromRequest(r *http.Request) (webrtc.SessionDescription, error) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return webrtc.SessionDescription{}, err
-	}
+func OfferFromRequest(body string) (webrtc.SessionDescription, error) {
 	offer := webrtc.SessionDescription{}
-	err = signal.Decode(string(body), &offer)
+	err := Decode(body, &offer)
 	if err != nil {
 		return webrtc.SessionDescription{}, err
 	}

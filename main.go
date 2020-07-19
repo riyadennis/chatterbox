@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"github.com/riyadennis/chatterbox/internal"
 	"github.com/riyadennis/chatterbox/internal/handler"
-	"log"
-	"net/http"
 )
 
 func main() {
-	http.HandleFunc("/sdp", handler.SDPRequest)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", handler.Port), nil))
+	sdpChan := internal.HTTPSDPServer(handler.Port)
+	err := handler.SDPRequest(<-sdpChan)
+	if err != nil {
+		panic(err)
+	}
 }
