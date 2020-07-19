@@ -5,6 +5,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v2"
 	"github.com/riyadennis/chatterbox/internal"
+	"github.com/sirupsen/logrus"
 	"io"
 	"time"
 )
@@ -13,18 +14,19 @@ var (
 	Port = "8080"
 )
 
-func SDPRequest(requestOffer string) error {
+func SDPRequest(requestOffer string, errChan chan error) {
 	offer, err := internal.OfferFromRequest(requestOffer)
 	if err != nil {
-		return err
+		logrus.Errorf("unable to access offer from request :: %v", err)
+		errChan <- err
 	}
 	peerCon, err := internal.PeerConnection(offer)
 	if err != nil {
-		return err
+		errChan <- err
 	}
 	// Allow us to receive 1 video track
 	if _, err = peerCon.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo); err != nil {
-		return err
+		errChan <- err
 	}
 
 	localTrackChan := make(chan *webrtc.Track)
@@ -53,12 +55,12 @@ func SDPRequest(requestOffer string) error {
 		for {
 			i, readErr := remoteTrack.Read(rtpBuf)
 			if readErr != nil {
-				panic(readErr)
+				errChan <- readErr
 			}
 
 			// ErrClosedPipe means we don't have any subscribers, this is ok if no peers have connected yet
 			if _, err = localTrack.Write(rtpBuf[:i]); err != nil && err != io.ErrClosedPipe {
-				panic(err)
+				errChan <- err
 			}
 		}
 	})
@@ -66,25 +68,25 @@ func SDPRequest(requestOffer string) error {
 	// Set the remote SessionDescription
 	err = peerCon.SetRemoteDescription(offer)
 	if err != nil {
-		return err
+		errChan <- err
 	}
 
 	// Create answer
 	answer, err := peerCon.CreateAnswer(nil)
 	if err != nil {
-		return err
+		errChan <- err
 	}
 
 	// Sets the LocalDescription, and starts our UDP listeners
 	err = peerCon.SetLocalDescription(answer)
 	if err != nil {
-		return err
+		errChan <- err
 	}
 
 	// Get the LocalDescription and take it to base64 so we can paste in browser
 	ans, err := internal.Encode(answer)
 	if err != nil {
-		return err
+		errChan <- err
 	}
 	fmt.Printf("local desc outside for %s", ans)
 	localTrack := <-localTrackChan
@@ -94,39 +96,39 @@ func SDPRequest(requestOffer string) error {
 
 		recvOnlyOffer, err := internal.OfferFromRequest(requestOffer)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 		// Create a new PeerConnection
 		peerCon, err := internal.PeerConnection(recvOnlyOffer)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 
 		_, err = peerCon.AddTrack(localTrack)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 
 		// Set the remote SessionDescription
 		err = peerCon.SetRemoteDescription(recvOnlyOffer)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 
 		// Create answer
 		answer, err := peerCon.CreateAnswer(nil)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 
 		// Sets the LocalDescription, and starts our UDP listeners
 		err = peerCon.SetLocalDescription(answer)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 		ans, err := internal.Encode(answer)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 
 		// Get the LocalDescription and take it to base64 so we can paste in browser
