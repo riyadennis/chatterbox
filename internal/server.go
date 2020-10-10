@@ -7,10 +7,14 @@ import (
 )
 
 // HTTPSDPServer starts a HTTP Server that consumes SDPs
-func HTTPSDPServer(port string) chan string {
+func HTTPSDPServer(port string) (chan string, chan error) {
 	sdpChan := make(chan string)
+	errChan := make(chan error)
 	http.HandleFunc("/sdp", func(w http.ResponseWriter, r *http.Request) {
-		body, _ := ioutil.ReadAll(r.Body)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			errChan <- err
+		}
 		w.Header().Set("Access-Control-Allow-Origin", "localhost:8080")
 		w.Write([]byte("done"))
 		sdpChan <- string(body)
@@ -19,9 +23,9 @@ func HTTPSDPServer(port string) chan string {
 	go func() {
 		err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 		if err != nil {
-			panic(err)
+			errChan <- err
 		}
 	}()
 
-	return sdpChan
+	return sdpChan, errChan
 }

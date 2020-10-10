@@ -7,13 +7,12 @@ import (
 )
 
 func main() {
-	errChan := make(chan error, 2)
-	sdpChan := internal.HTTPSDPServer(handler.Port)
+	sdpChan, errChan := internal.HTTPSDPServer(handler.Port)
 	for {
 		select {
 		case err := <-errChan:
 			if err != nil {
-				logrus.Errorf("error from request :: %v", err)
+				logrus.Fatalf("error from request :: %v", err)
 			}
 		case sdp := <-sdpChan:
 			handler.SDPRequest(sdp, errChan)
